@@ -1,174 +1,122 @@
-# Crop Yield Prediction Using Machine Learning
+# AgroYield Intelligence
 
-A comprehensive machine learning system for predicting crop yields across 11 crop types in 50 US states using climate, soil, and geospatial data.
+AgroYield Intelligence is an end-to-end machine learning system for crop yield prediction across U.S. states and counties. It combines data preprocessing, model training, model serving through a Flask API, and an interactive React client for exploration and inference.
 
-## 🎯 Project Overview
+## Overview
 
-This project implements a production-ready crop yield prediction system that:
-- Trains and compares 17+ machine learning models
-- Provides a REST API for predictions
-- Features an interactive React web dashboard
-- Achieves R² > 0.98 on test data
+The project supports:
+- Multi-model training and evaluation for crop yield regression
+- API-based single and regional prediction workflows
+- Model selection and performance inspection endpoints
+- Frontend dashboards for predictions and metrics
 
-## 📁 Project Structure
+## Repository Structure
 
-```
-project/
-├── data/
-│   ├── raw/                    # Raw data files
-│   └── processed/              # Preprocessed data and artifacts
-├── src/
-│   ├── preprocess_data.py      # Data preprocessing pipeline
-│   └── model/
-│       └── train_models.py     # Model training pipeline
-├── api/
-│   ├── app.py                  # Flask REST API
-│   └── artifacts/              # Models and preprocessors
-├── client/                     # React frontend
+```text
+.
+├── api/                          # Flask prediction API
+│   └── app.py
+├── client/                       # React frontend
+│   ├── public/
 │   └── src/
-│       └── pages/              # Frontend pages
-├── models/                      # Trained model files
-├── notebooks/                   # Jupyter notebooks (EDA)
-└── requirements.txt            # Python dependencies
+├── models/
+│   ├── error_analysis/           # Per-model error analysis outputs
+│   └── feature_importance/       # Feature importance CSV outputs
+├── src/
+│   ├── download_data/            # Data acquisition scripts
+│   ├── model/                    # Training and testing scripts
+│   ├── merge_master_data.py
+│   └── preprocess_data.py
+├── requirements.txt
+└── sync_models_to_api.py         # Copies model artifacts for API serving
 ```
 
-## 🚀 Quick Start
+## Technology Stack
+
+- Python (data processing, modeling, API)
+- Flask + Flask-CORS (serving inference endpoints)
+- scikit-learn and gradient boosting libraries (modeling)
+- React (frontend interface)
+
+## Setup
 
 ### Prerequisites
 
 - Python 3.8+
 - Node.js 16+
-- npm or yarn
+- npm
 
-### Installation
+### Install Backend Dependencies
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/Abdul-Wahab-17/Crop-Yield-Prediction.git
-   cd Crop-Yield-Prediction
-   ```
+```bash
+pip install -r requirements.txt
+```
 
-2. **Install Python dependencies**
-   ```bash
-   pip install -r requirements.txt
-   ```
+### Install Frontend Dependencies
 
-3. **Install frontend dependencies**
-   ```bash
-   cd client
-   npm install
-   ```
+```bash
+cd client
+npm install
+```
 
-### Running the Project
+## Running the System
 
-#### Step 1: Preprocess Data (if needed)
+### 1. Preprocess Data
+
 ```bash
 python src/preprocess_data.py
 ```
 
-#### Step 2: Train Models (if needed)
+### 2. Train Models
+
 ```bash
 python src/model/train_models.py
 ```
 
-#### Step 3: Sync Models to API
+### 3. Sync Model Artifacts to API
+
 ```bash
 python sync_models_to_api.py
 ```
 
-#### Step 4: Start the API Server
+### 4. Start the API
+
 ```bash
 cd api
 python app.py
 ```
-API will run on `http://localhost:5000`
 
-#### Step 5: Start the Frontend
+Default API URL: `http://localhost:5000`
+
+### 5. Start the Frontend
+
 ```bash
 cd client
 npm start
 ```
-Frontend will run on `http://localhost:3000`
 
-## 📡 API Endpoints
+Default frontend URL: `http://localhost:3000`
 
-### Core Endpoints
+## API Endpoints
 
-- `GET /health` - API health check
-- `GET /metadata` - Available crops, states, and models
-- `GET /counties/<state>` - Counties for a given state
-- `GET /valid-states/<crop>` - Valid states for a crop
-- `GET /models` - List all available models
-- `POST /models/<model_name>` - Switch active model
-- `POST /predict` - Single crop yield prediction
-- `POST /predict-regional` - Predict all crops for a region
-- `GET /metrics` - Model comparison metrics
+Core endpoints exposed by the Flask app:
+- `GET /health`
+- `GET /metadata`
+- `GET /counties/<state>`
+- `GET /valid-states/<crop>`
+- `GET /models`
+- `POST /models/<model_name>`
+- `POST /predict`
+- `POST /predict-regional`
+- `GET /metrics`
+- `GET /feature-engineering`
+- `GET /feature-importance`
+- `GET /feature-importance/<model>`
 
-### Bonus Endpoints
+## Example Requests
 
-- `GET /feature-engineering` - Feature engineering documentation
-- `GET /feature-importance` - List models with feature importance
-- `GET /feature-importance/<model>` - Feature importance for a model
+### Single Prediction
 
-## 🎨 Frontend Features
-
-- **Home Page**: Project overview and statistics
-- **Predict Page**: Single crop yield prediction with comprehensive form
-- **Regional Page**: Batch predictions for all crops in a location
-- **Metrics Page**: Interactive charts comparing model performance
-  - R² Score comparison
-  - Training Time comparison
-  - MAE comparison
-  - RMSE comparison
-  - Feature Engineering documentation
-  - Feature Importance visualization
-
-## 🤖 Models
-
-The system includes 17+ models across three categories:
-
-### Baselines
-- Mean Baseline
-- Median Baseline
-- Last Value Baseline
-- Moving Average Baseline
-
-### Classical ML
-- Linear Regression
-- Ridge Regression
-- Decision Tree
-- K-Nearest Neighbors
-- Support Vector Regression
-
-### Ensemble/Advanced
-- Random Forest (Best: R² = 0.9876)
-- Gradient Boosting
-- XGBoost
-- LightGBM
-- CatBoost (optional)
-- Voting Ensemble
-- Stacking Ensemble
-
-## 📊 Performance
-
-Top 5 Models (by R²):
-1. Random Forest - R²: 0.9876, RMSE: 121.50
-2. Voting Ensemble - R²: 0.9854, RMSE: 131.91
-3. XGBoost - R²: 0.9846, RMSE: 135.42
-4. Gradient Boosting - R²: 0.9835, RMSE: 140.18
-5. Decision Tree - R²: 0.9818, RMSE: 147.29
-
-## 🔧 Feature Engineering
-
-The system creates 13 engineered features:
-- **Time Features (2)**: Year_Since_Start, Year_Squared
-- **Climate Interactions (4)**: temp_prcp_interaction, gdd_per_day, moisture_stress, temp_variability
-- **Soil Features (2)**: soil_quality_score, loam_index
-- **Geographic Features (3)**: lat_squared, long_squared, lat_long_interaction
-
-## 📝 Usage Examples
-
-### API: Single Prediction
 ```bash
 curl -X POST http://localhost:5000/predict \
   -H "Content-Type: application/json" \
@@ -180,7 +128,8 @@ curl -X POST http://localhost:5000/predict \
   }'
 ```
 
-### API: Regional Prediction
+### Regional Prediction
+
 ```bash
 curl -X POST http://localhost:5000/predict-regional \
   -H "Content-Type: application/json" \
@@ -191,45 +140,21 @@ curl -X POST http://localhost:5000/predict-regional \
   }'
 ```
 
-## 🛠️ Development
+## Development Notes
 
-### Key Scripts
-- `src/preprocess_data.py` - Data preprocessing
-- `src/model/train_models.py` - Model training
-- `sync_models_to_api.py` - Sync models to API artifacts
-- `api/app.py` - Flask API server
+Key scripts:
+- `src/preprocess_data.py`: preprocessing pipeline
+- `src/model/train_models.py`: model training pipeline
+- `src/model/testing.py`: model testing utilities
+- `sync_models_to_api.py`: artifact synchronization for API loading
+- `api/app.py`: API entry point
 
-## 📚 Documentation
+## Troubleshooting
 
-- `PROJECT_COMPLETENESS_CHECK.md` - Project completeness analysis
-- `TRAINING_OUTPUT_ANALYSIS.md` - Training results analysis
-- `eee/project_report.tex` - Full project report (LaTeX)
+- If models fail to load in the API, run `python sync_models_to_api.py` and verify expected artifacts are available to the API.
+- If the frontend cannot reach the API, ensure the API is running on port `5000` and review CORS/API URL configuration.
+- If training fails, verify all Python dependencies installed from `requirements.txt` are available in the active environment.
 
-## ⚠️ Troubleshooting
+## License
 
-### Models not loading
-- Ensure models are in `api/artifacts/` directory
-- Run `python sync_models_to_api.py` to sync models
-- Check that all required artifacts exist
-
-### API errors
-- Verify Flask is installed: `pip install flask flask-cors`
-- Check that artifacts directory exists
-- Review console output for specific error messages
-
-### Frontend not connecting
-- Ensure API is running on port 5000
-- Check CORS settings in `api/app.py`
-- Verify API endpoint URLs in frontend code
-
-## 👥 Authors
-
-- **Abdul Wahab**
-
-## 🙏 Acknowledgments
-
-- USDA NASS for agricultural data
-- Climate data sources
-- Open-source ML libraries
-
-
+Add your project license information here (for example, MIT, Apache-2.0, or a custom academic/research license).
