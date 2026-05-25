@@ -6,7 +6,7 @@ client/build/
 client/.env
 client/.DS_Store
 client/.cache/
-
+node_modules
 # npm logs
 npm-debug.log*
 yarn-debug.log*
@@ -24,6 +24,10 @@ __pycache__/
 .venv/
 venv/
 *.sqlite3
+
+*.tex
+catboost_info
+catboost_info/*
 
 # Artifacts / datasets / trained models
 api/artifacts/
@@ -57,3 +61,5 @@ data/
 
 # Optional: ignore PDF reports / temp documents
 *.pdf
+*.zip
+*.rar
