@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../api';
 import './../App.css';
 
 function App() {
@@ -38,7 +39,7 @@ function App() {
 
   // Fetch Metadata on Load
   useEffect(() => {
-    fetch('http://localhost:5000/metadata')
+    fetch(`${API_URL}/metadata`)
       .then(res => res.json())
       .then(data => {
         setMetadata(data);
@@ -50,7 +51,7 @@ function App() {
   // Fetch valid states when crop changes
   useEffect(() => {
     if (formData.Crop) {
-      fetch(`http://localhost:5000/valid-states/${formData.Crop}`)
+      fetch(`${API_URL}/valid-states/${formData.Crop}`)
         .then(res => res.json())
         .then(data => setValidStates(data.states))
         .catch(err => {
@@ -67,7 +68,7 @@ function App() {
   // Fetch Counties when State changes
   useEffect(() => {
     if (formData.State) {
-      fetch(`http://localhost:5000/counties/${formData.State}`)
+      fetch(`${API_URL}/counties/${formData.State}`)
         .then(res => res.json())
         .then(data => setCounties(data.counties))
         .catch(err => console.error("Failed to load counties", err));
@@ -89,7 +90,7 @@ function App() {
     setSelectedModel(newModel);
 
     // Optionally switch model on backend
-    fetch(`http://localhost:5000/models/${newModel}`, {
+    fetch(`${API_URL}/models/${newModel}`, {
       method: 'POST'
     })
       .then(res => res.json())
@@ -206,7 +207,7 @@ function App() {
     try {
       const requestData = { ...formData, model: selectedModel };
 
-      const response = await fetch('http://localhost:5000/predict', {
+      const response = await fetch(`${API_URL}/predict`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(requestData)
@@ -324,35 +325,35 @@ function App() {
             <div className="input-grid">
               <div className="input-group">
                 <label>Total Rainfall (mm)</label>
-                <input type="number" name="prcp_growing_total" placeholder="Default: 500" value={formData.prcp_growing_total} onChange={handleChange} />
+                <input type="number" name="prcp_growing_total" placeholder="County average" value={formData.prcp_growing_total} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Avg Temperature (°C)</label>
-                <input type="number" name="tavg_growing_avg" placeholder="Default: 20" value={formData.tavg_growing_avg} onChange={handleChange} />
+                <input type="number" name="tavg_growing_avg" placeholder="County average" value={formData.tavg_growing_avg} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Min Temperature (°C)</label>
-                <input type="number" name="tmin_growing_avg" placeholder="Default: 14" value={formData.tmin_growing_avg} onChange={handleChange} />
+                <input type="number" name="tmin_growing_avg" placeholder="County average" value={formData.tmin_growing_avg} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Max Temperature (°C)</label>
-                <input type="number" name="tmax_growing_avg" placeholder="Default: 26" value={formData.tmax_growing_avg} onChange={handleChange} />
+                <input type="number" name="tmax_growing_avg" placeholder="County average" value={formData.tmax_growing_avg} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Relative Humidity (%)</label>
-                <input type="number" name="rh_growing_avg" placeholder="Default: 65" value={formData.rh_growing_avg} onChange={handleChange} />
+                <input type="number" name="rh_growing_avg" placeholder="County average" value={formData.rh_growing_avg} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Growing Degree Days</label>
-                <input type="number" name="gdd_total" placeholder="Default: 2500" value={formData.gdd_total} onChange={handleChange} />
+                <input type="number" name="gdd_total" placeholder="County average" value={formData.gdd_total} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Heat Stress Days</label>
-                <input type="number" name="heat_stress_days" placeholder="Default: 5" value={formData.heat_stress_days} onChange={handleChange} />
+                <input type="number" name="heat_stress_days" placeholder="County average" value={formData.heat_stress_days} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Temperature Range (°C)</label>
-                <input type="number" name="temp_range_avg" placeholder="Default: 12" value={formData.temp_range_avg} onChange={handleChange} />
+                <input type="number" name="temp_range_avg" placeholder="County average" value={formData.temp_range_avg} onChange={handleChange} />
               </div>
             </div>
           </div>
@@ -363,35 +364,35 @@ function App() {
             <div className="input-grid">
               <div className="input-group">
                 <label>Clay (%)</label>
-                <input type="number" name="clay_pct" placeholder="Default: 20" value={formData.clay_pct} onChange={handleChange} />
+                <input type="number" name="clay_pct" placeholder="County average" value={formData.clay_pct} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Sand (%)</label>
-                <input type="number" name="sand_pct" placeholder="Default: 40" value={formData.sand_pct} onChange={handleChange} />
+                <input type="number" name="sand_pct" placeholder="County average" value={formData.sand_pct} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Silt (%)</label>
-                <input type="number" name="silt_pct" placeholder="Default: 40" value={formData.silt_pct} onChange={handleChange} />
+                <input type="number" name="silt_pct" placeholder="County average" value={formData.silt_pct} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Organic Matter (%)</label>
-                <input type="number" name="organic_matter_pct" placeholder="Default: 2.5" value={formData.organic_matter_pct} onChange={handleChange} />
+                <input type="number" name="organic_matter_pct" placeholder="County average" value={formData.organic_matter_pct} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>pH</label>
-                <input type="number" name="ph" placeholder="Default: 6.5" step="0.1" value={formData.ph} onChange={handleChange} />
+                <input type="number" name="ph" placeholder="County average" step="0.1" value={formData.ph} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Bulk Density (g/cm³)</label>
-                <input type="number" name="bulk_density" placeholder="Default: 1.3" step="0.1" value={formData.bulk_density} onChange={handleChange} />
+                <input type="number" name="bulk_density" placeholder="County average" step="0.1" value={formData.bulk_density} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>CEC</label>
-                <input type="number" name="cec" placeholder="Default: 15" value={formData.cec} onChange={handleChange} />
+                <input type="number" name="cec" placeholder="County average" value={formData.cec} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>AWC</label>
-                <input type="number" name="awc" placeholder="Default: 0.15" step="0.01" value={formData.awc} onChange={handleChange} />
+                <input type="number" name="awc" placeholder="County average" step="0.01" value={formData.awc} onChange={handleChange} />
               </div>
             </div>
           </div>
@@ -402,11 +403,11 @@ function App() {
             <div className="input-grid">
               <div className="input-group">
                 <label>Latitude</label>
-                <input type="number" name="Latitude" placeholder="Default: 38" step="0.01" value={formData.Latitude} onChange={handleChange} />
+                <input type="number" name="Latitude" placeholder="County average" step="0.01" value={formData.Latitude} onChange={handleChange} />
               </div>
               <div className="input-group">
                 <label>Longitude</label>
-                <input type="number" name="Longitude" placeholder="Default: -95" step="0.01" value={formData.Longitude} onChange={handleChange} />
+                <input type="number" name="Longitude" placeholder="County average" step="0.01" value={formData.Longitude} onChange={handleChange} />
               </div>
             </div>
           </div>
@@ -434,6 +435,11 @@ function App() {
             {result.typical_range && (
               <p className="typical-range" style={{ fontSize: '0.9em', color: '#666' }}>
                 Typical range: {result.typical_range}
+              </p>
+            )}
+            {result.defaults_source === 'county' && (
+              <p style={{ fontSize: '0.85em', color: '#666' }}>
+                Weather and soil fields left blank use this county's 1981–2018 averages.
               </p>
             )}
             {result.warnings && result.warnings.length > 0 && (

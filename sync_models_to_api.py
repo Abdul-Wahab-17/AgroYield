@@ -67,6 +67,30 @@ def sync_models():
         print(f"  ✓ Copied {len(error_files)} error analysis files")
     else:
         print(f"  ⚠ error_analysis directory not found (run training to generate)")
+
+    # Copy feature importance CSVs (served by /feature-importance)
+    importance_dir = models_dir / 'feature_importance'
+    if importance_dir.exists():
+        api_importance_dir = api_artifacts_dir / 'feature_importance'
+        api_importance_dir.mkdir(exist_ok=True, parents=True)
+        importance_files = list(importance_dir.glob('*_importance.csv'))
+        for importance_file in importance_files:
+            shutil.copy2(importance_file, api_importance_dir / importance_file.name)
+        print(f"  ✓ Copied {len(importance_files)} feature importance files")
+
+    # Copy encoders, scalers and metadata written by src/preprocess_data.py.
+    # The X_*/y_* splits are only needed for training, so they are skipped.
+    preprocessing_dir = project_root / 'data' / 'processed' / 'preprocessing_artifacts'
+    if preprocessing_dir.exists():
+        copied_pre = 0
+        for artifact in preprocessing_dir.iterdir():
+            if artifact.name.startswith(('X_', 'y_')):
+                continue
+            shutil.copy2(artifact, api_artifacts_dir / artifact.name)
+            copied_pre += 1
+        print(f"  ✓ Copied {copied_pre} preprocessing artifacts")
+    else:
+        print(f"  ⚠ {preprocessing_dir} not found (run src/preprocess_data.py first)")
     
     print("\n" + "="*70)
     print(f"✅ Sync complete: {copied} models copied, {skipped} skipped")

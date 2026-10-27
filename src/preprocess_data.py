@@ -216,6 +216,36 @@ class CropYieldPreprocessor:
         with open(self.artifacts_dir / 'metadata.json', 'w') as f:
             json.dump(self.convert_numpy(self.metadata), f, indent=2)
 
+    def save_valid_combinations(self, df):
+        """Record which states actually report yields for each crop.
+
+        The API uses this to refuse predictions for crops a state does not grow,
+        which the models would otherwise extrapolate wildly.
+        """
+        combos = {
+            crop: sorted(states.unique().tolist())
+            for crop, states in df.groupby('Crop')['State']
+        }
+        with open(self.artifacts_dir / 'valid_crop_state_combinations.json', 'w') as f:
+            json.dump(combos, f, indent=2)
+
+    # Raw inputs the API fills in when the user leaves them blank
+    COUNTY_DEFAULT_COLUMNS = [
+        'tavg_growing_avg', 'tmin_growing_avg', 'tmax_growing_avg', 'prcp_growing_total',
+        'rh_growing_avg', 'gdd_total', 'heat_stress_days', 'temp_range_avg',
+        'clay_pct', 'sand_pct', 'silt_pct', 'organic_matter_pct', 'ph', 'bulk_density',
+        'cec', 'awc', 'Latitude', 'Longitude',
+    ]
+
+    def save_county_defaults(self, train_df):
+        """Per-county location, soil and average growing-season weather from the
+        training years, so a prediction for a county uses that county's conditions."""
+        cols = [c for c in self.COUNTY_DEFAULT_COLUMNS if c in train_df.columns]
+        keys = train_df['County'].str.upper() + '_' + train_df['State']
+        means = train_df[cols].groupby(keys).mean().round(3)
+        with open(self.artifacts_dir / 'county_defaults.json', 'w') as f:
+            json.dump(means.to_dict(orient='index'), f)
+
     def save_datasets(self, X_train, X_val, X_test, y_train, y_val, y_test):
         datasets = {
             'X_train': X_train, 'X_val': X_val, 'X_test': X_test,
@@ -232,9 +262,11 @@ class CropYieldPreprocessor:
         df = self.handle_missing_values(df)
         df = self.create_features(df)
         self.compute_crop_statistics(df)
+        self.save_valid_combinations(df)
 
         # ---------- Temporal split first ----------
         train_df, val_df, test_df = self.temporal_split(df, test_years=test_years, val_years=val_years)
+        self.save_county_defaults(train_df)
 
         # ---------- Encode categorical ----------
         train_df = self.encode_categorical(train_df, fit=True)

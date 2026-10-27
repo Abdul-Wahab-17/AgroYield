@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_URL } from '../api';
 import { useNavigate } from 'react-router-dom';
 import '../App.css';
 
@@ -13,7 +14,7 @@ export default function Home() {
 
   useEffect(() => {
     // Fetch metadata to get actual crop and state counts
-    fetch('http://localhost:5000/metadata')
+    fetch(`${API_URL}/metadata`)
       .then(res => res.json())
       .then(data => {
         setStats(prev => ({

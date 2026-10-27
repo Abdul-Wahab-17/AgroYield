@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { API_URL } from '../api';
 import {
   Chart as ChartJS,
   CategoryScale,
@@ -39,7 +40,7 @@ function Metrics() {
   const [showErrorAnalysis, setShowErrorAnalysis] = useState(false);
 
   useEffect(() => {
-    fetch('http://localhost:5000/metrics')
+    fetch(`${API_URL}/metrics`)
       .then(res => res.json())
       .then(data => {
         if (data.error) setError(data.error);
@@ -55,7 +56,7 @@ function Metrics() {
       return;
     }
     setShowFeatureEng(true);
-    fetch('http://localhost:5000/feature-engineering')
+    fetch(`${API_URL}/feature-engineering`)
       .then(res => {
         if (!res.ok) {
           throw new Error(`HTTP error! status: ${res.status}`);
@@ -75,7 +76,7 @@ function Metrics() {
     setSelectedModel(modelName);
     setLoadingFeatures(true);
     const modelKey = modelName.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
-    fetch(`http://localhost:5000/feature-importance/${modelKey}`)
+    fetch(`${API_URL}/feature-importance/${modelKey}`)
       .then(res => res.json())
       .then(data => {
         if (data.error) {
@@ -98,7 +99,7 @@ function Metrics() {
     setShowErrorAnalysis(true);
     setLoadingErrorAnalysis(true);
     const modelKey = modelName.toLowerCase().replace(/\s+/g, '_').replace(/-/g, '_');
-    fetch(`http://localhost:5000/error-analysis/${modelKey}`)
+    fetch(`${API_URL}/error-analysis/${modelKey}`)
       .then(res => res.json())
       .then(data => {
         if (data.error) {

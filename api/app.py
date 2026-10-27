@@ -7,14 +7,35 @@ import pickle
 import json
 from pathlib import Path
 
+from fetch_artifacts import ensure_artifacts
+
 app = Flask(__name__)
 CORS(app)
 
 # --- CONFIGURATION ---
 # Use __file__ to get the directory where app.py is located, regardless of working directory
 BASE_DIR = Path(__file__).parent
-ARTIFACTS_DIR = BASE_DIR / "artifacts"
-MODELS_DIR = BASE_DIR / "artifacts"
+ARTIFACTS_DIR = Path(os.environ.get("AGROYIELD_ARTIFACTS_DIR", BASE_DIR / "artifacts"))
+MODELS_DIR = ARTIFACTS_DIR
+
+# Model file -> display name. Names match the "Model" column of model_comparison.csv,
+# so per-model R² (confidence), feature importance and error analysis line up.
+MODEL_NAMES = {
+    'random_forest.pkl': 'Random Forest',
+    'xgboost.pkl': 'XGBoost',
+    'lightgbm.pkl': 'LightGBM',
+    'catboost.pkl': 'CatBoost',
+    'gradient_boosting.pkl': 'Gradient Boosting',
+    'voting_ensemble.pkl': 'Voting Ensemble',
+    'stacking_ensemble.pkl': 'Stacking Ensemble',
+    'decision_tree.pkl': 'Decision Tree',
+    'k-nn.pkl': 'K-NN',
+    'linear_regression.pkl': 'Linear Regression',
+    'ridge_regression.pkl': 'Ridge Regression',
+    'svr.pkl': 'SVR',
+}
+
+ensure_artifacts(ARTIFACTS_DIR)
 
 # --- GLOBAL VARIABLES ---
 crop_encoder = None
@@ -30,6 +51,7 @@ FEATURE_ORDER = None
 PREPROCESSING_METADATA = None
 VALID_COMBINATIONS = None
 DEFAULTS = None
+COUNTY_DEFAULTS = {}
 MODEL_PERFORMANCE = {}
 
 # CRITICAL: Define crop-specific units based on training data analysis
@@ -45,6 +67,7 @@ CROP_UNITS = {
     'PEANUTS': {'unit': 'lbs/acre', 'typical_range': (2000, 4000)},
     'RICE': {'unit': 'lbs/acre', 'typical_range': (4000, 8000)},
     'HAY': {'unit': 'tons/acre', 'typical_range': (1.5, 4.5)},
+    'SUNFLOWER': {'unit': 'lbs/acre', 'typical_range': (800, 2000)},
 }
 
 # Feature Engineering Documentation
@@ -211,6 +234,13 @@ try:
             VALID_COMBINATIONS = json.load(f)
         print(f"   ✓ Valid Crop-State Combinations")
 
+    # Per-county location, soil and average weather (used for inputs left blank)
+    county_defaults_path = ARTIFACTS_DIR / 'county_defaults.json'
+    if county_defaults_path.exists():
+        with open(county_defaults_path, 'r') as f:
+            COUNTY_DEFAULTS = json.load(f)
+        print(f"   ✓ County Defaults ({len(COUNTY_DEFAULTS)} counties)")
+
     # Load Model Performance (for Confidence Estimation)
     csv_path = ARTIFACTS_DIR / 'model_comparison.csv'
     if csv_path.exists():
@@ -221,23 +251,14 @@ try:
              MODEL_PERFORMANCE[row['Model']] = float(row['R²'])
     print(f"   ✓ Model Performance Loaded ({len(MODEL_PERFORMANCE)} models)")
     
-    # Load ALL Available Models
+    # Load every known model that is present (a deployment may ship only a subset)
     print("\n5. Loading Models...")
-    # Priority order: ensemble models first, then others
-    priority_models = [
-        'xgboost.pkl', 'lightgbm.pkl', 'random_forest.pkl',
-        'catboost.pkl', 'gradient_boosting.pkl',
-        'voting_ensemble.pkl', 'stacking_ensemble.pkl'
-    ]
-    
-    # First, load priority models
-    for model_file in priority_models:
+    for model_file, model_name in MODEL_NAMES.items():
         model_path = MODELS_DIR / model_file
         if model_path.exists():
             try:
                 with open(model_path, 'rb') as f:
                     model = pickle.load(f)
-                model_name = model_file.replace('.pkl', '').replace('_', ' ').replace('-', ' ').title()
                 AVAILABLE_MODELS[model_name] = {
                     'model': model,
                     'file': model_file,
@@ -246,35 +267,12 @@ try:
                 print(f"   ✓ {model_name}: {type(model).__name__}")
             except Exception as e:
                 print(f"   ✗ Failed to load {model_file}: {e}")
-    
-    # Then, load any other .pkl files in the artifacts directory (excluding preprocessors)
-    excluded_files = {
-        'crop_encoder.pkl', 'state_encoder.pkl', 'county_encoder.pkl',
-        'numerical_scaler.pkl', 'weather_scaler.pkl', 'soil_scaler.pkl',
-        'geo_scaler.pkl', 'feature_names.pkl', 'X_train.pkl', 'X_val.pkl',
-        'X_test.pkl', 'y_train.pkl', 'y_val.pkl', 'y_test.pkl'
-    }
-    
-    for model_file in MODELS_DIR.glob('*.pkl'):
-        if model_file.name not in excluded_files and model_file.name not in priority_models:
-            try:
-                with open(model_file, 'rb') as f:
-                    model = pickle.load(f)
-                model_name = model_file.stem.replace('_', ' ').replace('-', ' ').title()
-                if model_name not in AVAILABLE_MODELS:  # Avoid duplicates
-                    AVAILABLE_MODELS[model_name] = {
-                        'model': model,
-                        'file': model_file.name,
-                        'type': type(model).__name__
-                    }
-                    print(f"   ✓ {model_name}: {type(model).__name__}")
-            except Exception as e:
-                print(f"   ✗ Failed to load {model_file.name}: {e}")
-    
+
     if not AVAILABLE_MODELS:
         raise Exception("No models found!")
-    
-    CURRENT_MODEL = list(AVAILABLE_MODELS.keys())[0]
+
+    # Default to the most accurate model that was loaded
+    CURRENT_MODEL = max(AVAILABLE_MODELS, key=lambda name: MODEL_PERFORMANCE.get(name, float('-inf')))
     print(f"\n   Default Model: {CURRENT_MODEL}")
     
     # Set defaults
@@ -297,6 +295,15 @@ except Exception as e:
     traceback.print_exc()
     raise
 
+
+
+def defaults_for(state, county):
+    """Inputs to use when the request leaves them blank: the county's own
+    averages if known, otherwise generic values."""
+    county_values = COUNTY_DEFAULTS.get(f"{str(county).upper()}_{str(state).upper()}")
+    if county_values:
+        return {**DEFAULTS, **county_values}, 'county'
+    return DEFAULTS, 'generic'
 
 
 @app.route('/models', methods=['GET'])
@@ -395,7 +402,8 @@ def predict():
                 }), 400
         
         # Apply defaults
-        for key, default_val in DEFAULTS.items():
+        defaults, defaults_source = defaults_for(input_data['State'], input_data['County'])
+        for key, default_val in defaults.items():
             val = data.get(key)
             input_data[key] = float(val) if val not in [None, ""] else float(default_val)
         
@@ -501,6 +509,7 @@ def predict():
             'typical_range': f"{min_expected}-{max_expected} {crop_info['unit']}",
             'confidence': confidence_label,
             'confidence_score': round(r2_score, 4),
+            'defaults_source': defaults_source,
             'warnings': warnings if warnings else None
         })
         
@@ -549,6 +558,10 @@ def predict_regional():
         confidence_label = "Low"
     
     for crop_val in crop_encoder.classes_:
+        # Skip crops with no yield records in this state; predictions there are extrapolation
+        if VALID_COMBINATIONS and state_val not in VALID_COMBINATIONS.get(crop_val, [state_val]):
+            results[crop_val] = {"not_grown": True}
+            continue
         try:
             input_data = {
                 'Crop': crop_val,
@@ -557,7 +570,8 @@ def predict_regional():
             }
             
             # Apply defaults
-            for key, default_val in DEFAULTS.items():
+            defaults, _ = defaults_for(state_val, county_val)
+            for key, default_val in defaults.items():
                 val = data.get(key)
                 input_data[key] = float(val) if val not in [None, ""] else float(default_val)
             
@@ -762,7 +776,8 @@ def list_error_analysis():
 
 
 if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
     print("🚀 Starting Flask Server")
     print(f"Model: {CURRENT_MODEL}")
-    print(f"Port: 5000\n")
-    app.run(debug=True, port=5000)
+    print(f"Port: {port}\n")
+    app.run(debug=os.environ.get("FLASK_DEBUG") == "1", port=port)
