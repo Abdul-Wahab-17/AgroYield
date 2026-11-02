@@ -46,9 +46,15 @@ del _history
 FIPS_BY_NAME = {(r.state, r.county.upper()): r.fips for r in COUNTIES.itertuples()}
 NAME_BY_FIPS = {r.fips: (r.state, r.county) for r in COUNTIES.itertuples()}
 
-# series -> state -> sorted county names that have yield records (drives the UI drop-downs)
+# A county-series is only served if it was observed recently: the models lean on a county's recent yields,
+# and for a county last observed decades ago the prediction is unreliable (tests/test_api.py checks this).
+LAST_DATA_YEAR = max(v[0][-1] for v in HISTORY.values())
+MAX_STALENESS = 15
+ACTIVE = {key for key, v in HISTORY.items() if LAST_DATA_YEAR - v[0][-1] <= MAX_STALENESS}
+
+# series -> state -> sorted county names that have recent yield records (drives the UI drop-downs)
 COUNTIES_BY_SERIES = {}
-for (series, fips) in HISTORY:
+for (series, fips) in ACTIVE:
     state, name = NAME_BY_FIPS.get(fips, (None, None))
     if state:
         COUNTIES_BY_SERIES.setdefault(series, {}).setdefault(state, []).append(name)
@@ -60,6 +66,12 @@ def records(df):
     """DataFrame -> JSON-safe records (NaN becomes null; Flask would emit invalid JSON)."""
     return df.astype(object).where(df.notna(), None).to_dict(orient="records")
 
+
+for _s in list(CATALOGUE):
+    if _s not in COUNTIES_BY_SERIES:
+        del CATALOGUE[_s]            # discontinued series: nothing recent to predict from
+    else:
+        CATALOGUE[_s]["states"] = sorted(COUNTIES_BY_SERIES[_s])
 
 OVERRIDABLE = WEATHER + CLIMDIV + SOIL + ["lat", "lon"]
 _IS_NAN = lambda v: v is None or (isinstance(v, float) and np.isnan(v))  # noqa: E731
@@ -98,10 +110,14 @@ def resolve_fips(state, county):
 
 
 def build_row(series, fips, year, overrides):
-    if (series, fips) not in HISTORY:
+    if (series, fips) not in ACTIVE:
         state, name = NAME_BY_FIPS[fips]
-        raise ApiError(f"No {CATALOGUE[series]['commodity'].title()} yield records for {name}, {state}",
-                       valid_states=CATALOGUE[series]["states"][:12])
+        crop = CATALOGUE[series]["commodity"].title()
+        if (series, fips) in HISTORY:
+            last = int(HISTORY[(series, fips)][0][-1])
+            raise ApiError(f"{crop} yields for {name}, {state} were last recorded in {last}, too long ago "
+                           f"to predict reliably", last_recorded=last)
+        raise ApiError(f"No {crop} yield records for {name}, {state}", valid_states=CATALOGUE[series]["states"][:12])
     info = CATALOGUE[series]
     years, yields, n_all, sum_all = HISTORY[(series, fips)]
     row = {c: np.nan for c in FEATURES}
@@ -162,7 +178,7 @@ def metadata():
         crops.setdefault(s["commodity"], {"commodity": s["commodity"], "series": [], "states": set()})
         crops[s["commodity"]]["series"].append(
             {"series": s["series"], "class": s["class"], "practice": s["practice"], "unit": s["unit"],
-             "headline": s["headline"], "rows": s["rows"]})
+             "headline": s["headline"], "rows": s["rows"], "states": s["states"]})
         crops[s["commodity"]]["states"].update(s["states"])
     out = [{**c, "states": sorted(c["states"])} for c in sorted(crops.values(), key=lambda c: c["commodity"])]
     return jsonify({"crops": out, "models": list(MODELS), "default_model": DEFAULT_MODEL})
@@ -193,7 +209,7 @@ def predict_regional():
     fips = resolve_fips(data.get("state") or data.get("State"), data.get("county") or data.get("County"))
     results, absent = [], []
     for s in sorted((s for s in CATALOGUE.values() if s["headline"]), key=lambda s: s["commodity"]):
-        if (s["series"], fips) in HISTORY:
+        if (s["series"], fips) in ACTIVE:
             results.append(predict_one(s["series"], fips, year, data, model))
         else:
             absent.append(s["commodity"])
@@ -214,8 +230,8 @@ def metrics_commodities():
 @app.route("/feature-importance/<model_name>")
 def feature_importance(model_name):
     path = ARTIFACTS / "feature_importance" / (model_name.lower().replace(" ", "_").replace("-", "_") + ".csv")
-    if not path.exists():
-        raise ApiError(f"No feature importances for {model_name}", status=404)
+    if not path.exists():  # e.g. linear models, K-NN: not an error, just nothing to show
+        return jsonify({"model": model_name, "features": []})
     df = pd.read_csv(path)
     return jsonify({"model": model_name, "features": records(df.head(25))})
 

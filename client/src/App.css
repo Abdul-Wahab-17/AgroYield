@@ -466,3 +466,12 @@ small {
     width: 100%;
   }
 }
+
+/* Small screens: let the nav links wrap, give forms and tables room */
+@media (max-width: 600px) {
+  .navbar { padding: 10px 12px; justify-content: center; }
+  .nav-links { flex-wrap: wrap; justify-content: center; gap: 4px; }
+  .nav-links li a { padding: 6px 10px; }
+  .app-container, .main-content, .home-container { padding-left: 12px; padding-right: 12px; }
+  .table-container { overflow-x: auto; }
+}

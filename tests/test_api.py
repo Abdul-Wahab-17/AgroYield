@@ -82,3 +82,31 @@ def test_response_says_whether_inputs_were_overridden(client):
     assert "overrides" not in plain["inputs"]
     over = post(client, "/predict", commodity="CORN", state="IA", county="POLK", year=2026, prcp_season=300).get_json()
     assert "prcp_season" in over["inputs"]
+
+
+def test_counties_not_observed_recently_are_refused_with_the_reason(client):
+    r = post(client, "/predict", commodity="WHEAT", state="CO", county="Alamosa", year=2026)  # last recorded 2008
+    assert r.status_code == 400 and "too long ago" in r.get_json()["error"]
+
+
+def test_every_served_series_gives_plausible_predictions(client):
+    import app as A
+    for series, info in A.CATALOGUE.items():
+        state = info["states"][0]
+        county = A.COUNTIES_BY_SERIES[series][state][0]
+        d = post(client, "/predict", series=series, state=state, county=county, year=2026).get_json()
+        lo, hi = d["typical_range"]
+        assert lo / 2 < d["prediction"] < 1.5 * hi, (series, county, d["prediction"], lo, hi)
+
+
+def test_models_without_feature_importance_return_an_empty_list_not_an_error(client):
+    r = client.get("/feature-importance/Ridge Regression")
+    assert r.status_code == 200 and r.get_json()["features"] == []
+
+
+def test_each_variety_lists_only_states_that_have_counties(client):
+    meta = client.get("/metadata").get_json()
+    for crop in meta["crops"]:
+        for s in crop["series"]:
+            for state in s["states"]:
+                assert client.get(f"/counties/{state}", query_string={"series": s["series"]}).get_json()["counties"], (s["series"], state)

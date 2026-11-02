@@ -6,6 +6,14 @@ import Metrics from './pages/Metrics';
 import Regional from './pages/Regional';
 import './App.css';
 
+function NotFound() {
+  return (
+    <div className="app-container">
+      <header><h1>Page not found</h1><p>That address doesn't exist. Try <Link to="/predict">Predict</Link> or <Link to="/">Home</Link>.</p></header>
+    </div>
+  );
+}
+
 function App() {
   return (
     <Router>
@@ -26,6 +34,7 @@ function App() {
             <Route path="/predict" element={<Predict />} />
             <Route path="/regional" element={<Regional />} />
             <Route path="/metrics" element={<Metrics />} />
+            <Route path="*" element={<NotFound />} />
           </Routes>
         </div>
       </div>

@@ -25,7 +25,7 @@ export default function Metrics() {
     if (!model) return;
     setImportance(null);
     fetch(`${API_URL}/feature-importance/${encodeURIComponent(model)}`)
-      .then(r => (r.ok ? r.json() : null)).then(setImportance).catch(() => setImportance(null));
+      .then(r => r.json()).then(setImportance).catch(() => setImportance(null));
   }, [model]);
 
   if (!data) return <div className="app-container"><p>{error || 'Loading…'}</p></div>;
@@ -93,7 +93,7 @@ export default function Metrics() {
             {rows.filter(r => r.Type === 'Model').map(r => <option key={r.Model} value={r.Model}>{r.Model}</option>)}
           </select>
         </div>
-        {importance ? (
+        {importance && importance.features.length > 0 ? (
           <div className="result-card">
             <Bar data={{ labels: importance.features.slice(0, 15).map(f => f.Feature),
                          datasets: [{ label: 'Importance', data: importance.features.slice(0, 15).map(f => f.Importance), backgroundColor: '#2e7d32' }] }}

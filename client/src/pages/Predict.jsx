@@ -31,7 +31,11 @@ export default function Predict() {
   const crop = useMemo(() => meta?.crops.find(c => c.commodity === form.commodity), [meta, form.commodity]);
   const series = useMemo(() => crop?.series.find(s => s.series === form.series) || crop?.series.find(s => s.headline) || crop?.series[0], [crop, form.series]);
 
-  useEffect(() => { if (series) setStates(crop.states); }, [crop, series]);
+  useEffect(() => {
+    if (!series) return;
+    setStates(series.states);
+    setForm(f => (f.state && !series.states.includes(f.state) ? { ...f, state: '', county: '' } : f));
+  }, [series]);
   useEffect(() => {
     if (!series || !form.state) { setCounties([]); return; }
     fetch(`${API_URL}/counties/${form.state}?series=${encodeURIComponent(series.series)}`)
@@ -90,7 +94,7 @@ export default function Predict() {
                 <option value="">Select a state</option>
                 {states.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              <small style={{ color: '#666' }}>States with {form.commodity.toLowerCase()} yield records</small>
+              <small style={{ color: '#666' }}>States with recent yield records for this variety</small>
             </div>
             <div className="input-group">
               <label>County</label>
