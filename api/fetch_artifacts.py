@@ -16,7 +16,7 @@ Environment variables:
 import os
 from pathlib import Path
 
-DEFAULT_MODEL_REPO = "wahab17/agroyield-models"
+DEFAULT_MODEL_REPO = "Wahab-MK17/agroyield-models"
 
 # Files the API cannot start without.
 REQUIRED_FILES = [
