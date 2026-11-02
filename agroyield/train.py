@@ -135,10 +135,17 @@ def run(variant: str = "A", n_jobs: int = -1, only=None, out_dir=None):
     Xte = test[dataset.FEATURES]
     rng = np.random.default_rng(SEED)
 
+    del df
+    # Linear models one-hot encode into a dense matrix. On a large dataset (variant B, 2.2M rows) that does not
+    # fit in 15 GB, so they train on a random 500k-row subsample there; variant A (1.1M rows) uses everything.
+    linear_cap = 500_000 if len(Xtv) > 1_500_000 else None
+
     fitted, val_pred, timings = {}, {}, {}
     for name, (kind, make, boosting, cap) in specs(n_jobs if n_jobs > 0 else 8).items():
         if only and name not in only:
             continue
+        if kind == "linear" and cap is None:
+            cap = linear_cap
         t0 = time.time()
         idx = rng.choice(len(Xtr), cap, replace=False) if cap and len(Xtr) > cap else slice(None)
         rounds = ROUNDS.get(name, 0)
