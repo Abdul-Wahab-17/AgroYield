@@ -1,4 +1,6 @@
-FROM python:3.12-slim
+# Build from a staged folder:  python scripts/publish_hf.py stage build/api && docker build -t agroyield-api build/api
+# (stage assembles app.py, fetch_artifacts.py, requirements.txt and the agroyield/ feature code side by side)
+FROM python:3.13-slim
 
 # libgomp is needed by LightGBM / XGBoost
 RUN apt-get update && apt-get install -y --no-install-recommends libgomp1 \
@@ -12,12 +14,13 @@ COPY --chown=app requirements.txt .
 RUN pip install --no-cache-dir --timeout 120 --retries 5 -r requirements.txt
 
 COPY --chown=app app.py fetch_artifacts.py ./
+COPY --chown=app agroyield ./agroyield
 RUN mkdir -p artifacts && chown app artifacts
 USER app
 
 ENV PORT=7860 \
     PYTHONUNBUFFERED=1
 EXPOSE 7860
-# One worker: each worker holds every model in memory. Artifacts are fetched from
-# the Hugging Face Hub on first start if they are not mounted into /app/artifacts.
-CMD gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --timeout 180 app:app
+# One worker: each worker holds every model in memory. Artifacts are fetched from the
+# Hugging Face Hub on first start unless they are mounted into /app/artifacts.
+CMD gunicorn --bind 0.0.0.0:${PORT} --workers 1 --threads 4 --timeout 300 app:app

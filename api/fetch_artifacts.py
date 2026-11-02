@@ -20,15 +20,14 @@ DEFAULT_MODEL_REPO = "wahab17/agroyield-models"
 
 # Files the API cannot start without.
 REQUIRED_FILES = [
-    "crop_encoder.pkl",
-    "state_encoder.pkl",
-    "county_encoder.pkl",
-    "numerical_scaler.pkl",
-    "weather_scaler.pkl",
-    "soil_scaler.pkl",
-    "geo_scaler.pkl",
-    "feature_names.pkl",
-    "preprocessing_metadata.json",
+    "manifest.json",
+    "series_catalogue.json",
+    "county_defaults.json",
+    "counties.csv",
+    "history.parquet",
+    "model_comparison.csv",
+    "per_commodity.csv",
+    "summary.json",
 ]
 
 

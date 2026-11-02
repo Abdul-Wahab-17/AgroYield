@@ -29,12 +29,11 @@ venv/
 catboost_info
 catboost_info/*
 
-# Artifacts / datasets / trained models
+# Artifacts / datasets / trained models (models are published to the Hugging Face Hub)
 api/artifacts/
-models/*.pkl
-models/*.cbm
-models/test_set_results.*
-models/model_comparison.*
+models/
+!results/
+build/
 data/
 *.h5
 *.joblib

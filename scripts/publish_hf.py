@@ -2,7 +2,8 @@
 Publish the trained artifacts and the API to Hugging Face.
 
     python scripts/publish_hf.py models   # upload api/artifacts/ to the model repo
-    python scripts/publish_hf.py space    # deploy api/ as a Docker Space
+    python scripts/publish_hf.py space    # deploy the API as a Docker Space
+    python scripts/publish_hf.py stage D  # assemble the deployable folder in D (for a local docker build)
 
 Requires `pip install huggingface_hub` and `hf auth login` with a write token.
 Run `python sync_models_to_api.py` first so api/artifacts/ is complete.
@@ -23,9 +24,9 @@ from fetch_artifacts import DEFAULT_MODEL_REPO  # noqa: E402
 MODEL_REPO = DEFAULT_MODEL_REPO
 SPACE_REPO = DEFAULT_MODEL_REPO.split("/")[0] + "/agroyield-api"
 
-# Training splits are not needed for inference. The voting ensemble (~515 MB)
-# and K-NN (~100 MB) are left out to keep the hosted API small and fast to boot.
-EXCLUDE = ["X_*.pkl", "y_*.pkl", "voting_ensemble.pkl", "k-nn.pkl"]
+# api/artifacts/ is built by `python -m agroyield.pipeline export`, which already leaves out models
+# that are too large to host, so nothing else needs excluding.
+EXCLUDE = []
 
 MODEL_CARD = f"""---
 license: mit
@@ -73,17 +74,29 @@ def publish_models(api: HfApi) -> None:
     print(f"Models published: https://huggingface.co/{MODEL_REPO}")
 
 
+def stage(dest: Path) -> Path:
+    """Assemble the deployable API folder: app, downloader, pins, Dockerfile and the shared feature code."""
+    import shutil
+    dest = Path(dest)
+    if dest.exists():
+        shutil.rmtree(dest)
+    (dest / "agroyield").mkdir(parents=True)
+    for name in ("Dockerfile", "requirements.txt", "app.py", "fetch_artifacts.py"):
+        shutil.copy(API_DIR / name, dest / name)
+    for module in ("__init__.py", "features.py", "model.py"):
+        shutil.copy(ROOT / "agroyield" / module, dest / "agroyield" / module)
+    return dest
+
+
 def publish_space(api: HfApi) -> None:
     api.create_repo(SPACE_REPO, repo_type="space", space_sdk="docker", exist_ok=True)
     api.upload_file(path_or_fileobj=SPACE_README.encode(), path_in_repo="README.md",
                     repo_id=SPACE_REPO, repo_type="space")
-    api.upload_folder(
-        folder_path=API_DIR,
-        repo_id=SPACE_REPO,
-        repo_type="space",
-        allow_patterns=["Dockerfile", "requirements.txt", "app.py", "fetch_artifacts.py"],
-        commit_message="Deploy AgroYield API",
-    )
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        staged = stage(Path(tmp) / "api")
+        api.upload_folder(folder_path=staged, repo_id=SPACE_REPO, repo_type="space",
+                          commit_message="Deploy AgroYield API")
     host = SPACE_REPO.replace("/", "-").replace("_", "-").lower()
     print(f"Space deployed: https://huggingface.co/spaces/{SPACE_REPO}")
     print(f"API URL:        https://{host}.hf.space")
@@ -91,6 +104,9 @@ def publish_space(api: HfApi) -> None:
 
 if __name__ == "__main__":
     target = sys.argv[1] if len(sys.argv) > 1 else ""
+    if target == "stage":
+        print(f"staged at {stage(Path(sys.argv[2] if len(sys.argv) > 2 else 'build/api'))}")
+        sys.exit(0)
     if target not in ("models", "space"):
         sys.exit(__doc__)
     api = HfApi()

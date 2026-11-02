@@ -1,0 +1,26 @@
+{
+  "variant": "A",
+  "best_model": "Blend",
+  "best_baseline": "Persistence (last observed yield)",
+  "rows": {
+    "train": 1065377,
+    "val": 10905,
+    "test": 12739
+  },
+  "test_years": [
+    2023,
+    2025
+  ],
+  "test_best": {
+    "Model": "Blend",
+    "Type": "Model",
+    "n": 12739,
+    "MAPE": 12.689844652774834,
+    "MedAPE": 8.7519156097639,
+    "within10": 55.22411492267839,
+    "logRMSE": 0.1769174086246638,
+    "R2_log": 0.9843363176148469,
+    "train_seconds": NaN,
+    "skill_vs_best_baseline": 0.2847702970794348
+  }
+}

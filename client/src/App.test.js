@@ -5,7 +5,7 @@ beforeEach(() => {
   global.fetch = jest.fn(() =>
     Promise.resolve({
       ok: true,
-      json: () => Promise.resolve({ crops: ['CORN'], states: ['IOWA'], available_models: ['Random Forest'] }),
+      json: () => Promise.resolve({ crops: [], models: [], default_model: 'x' }),
     })
   );
 });
