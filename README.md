@@ -60,6 +60,8 @@ Every source is downloaded by a script in `agroyield/` with retries and resume, 
 
 `merge.py` joins everything on the 5-digit county FIPS code. (Joining on names loses counties such as "St. Clair" vs "ST CLAIR".) Of 2.2 M NASS rows, 1,455 had no county match. A **series** is commodity × class × production practice × utilization × unit; the 124 series with at least 1,000 county-years are modelled, and the series is a feature.
 
+**What the app serves.** The models lean on a county's recent yields, and a prediction for a county last observed decades ago is unreliable (it landed far outside the plausible range in testing). The API therefore only serves county-series observed in the last 15 years (2010 or later): **39 of the 124 series, covering 22 of the 23 crops**. Anything else is refused with the reason ("last recorded in 2008").
+
 **Features (61).** Season weather, NOAA climate and drought indices, soil, location, and the county's own recent yields for that series: the last yield, the mean of the last five, the all-time mean, and the gap in years. History only ever uses *earlier* years, so it is known when a season starts and cannot leak the target. `agroyield/features.py` is imported by both training and the API, so serving computes exactly what training did (`tests/test_features.py` checks this).
 
 ## Method
