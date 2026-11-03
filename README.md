@@ -44,6 +44,8 @@ Test set: **12,739 county-year observations from 2023–2025**. No model saw the
 - The strongest baseline is simply "same as the last observed yield". The gradient-boosted models remove about a quarter of its error, and the blend 28 %. That is a real gain, not a dramatic one: a county's own recent yield already explains most of next year's.
 - **The models lose on some crops.** For rice (146 test rows, 10.7 % vs 6.1 % for the baseline) and peanuts (277 rows, 11.4 % vs 11.0 %) persistence is as good or better, because those yields barely move from year to year. The per-crop table on the Metrics page shows every crop, including these.
 - The test years are thin. NASS stopped publishing most county estimates after about 2018 (about 5,000 county-years a year now, against about 21,000 in the 2000s and 50,000 in the 1980s), so 2023–2025 holds 12.7 k rows and rare crops have very few.
+
+**Does the pre-1981 data help?** Variant A trains on 1981 onward (daily NASA POWER weather exists from then). Variant B also uses 1909–1980, with daily-weather features left missing for those years: 2,169,644 training rows against 1,065,377. On the same 2023–2025 test rows, the B blend scores **12.8 %** mean error against A's **12.7 %** (XGBoost 13.0 % vs 12.9 %; median error and the share within 10 % are indistinguishable). Doubling the data with old, differently measured years buys nothing, so **variant A is the one shipped**. Full B results are in `results/*_B.*`; `python -m agroyield.pipeline train B` reproduces them.
 - A prediction is "expected yield under normal weather" unless you enter the year's weather. The models do respond to weather inputs (the tests check that a drought lowers corn), but the app has no live weather feed.
 
 ## Data
@@ -136,7 +138,7 @@ The API serves the 10 individual models. The blend is used for evaluation only, 
 agroyield/    pipeline: download_*.py, merge.py, features.py, train.py, export.py, pipeline.py
 api/          Flask API, Dockerfile, artifact downloader
 client/       React dashboard
-scripts/      publish to Hugging Face (models, Space, staging)
+scripts/      publish trained models to the Hugging Face Hub
 tests/        features, metrics, downloader parsing, API
 ```
 
