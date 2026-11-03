@@ -1,0 +1,18 @@
+{
+  "nass_rows": 2215608,
+  "rows_after_county_match": 2214153,
+  "rows_without_county": 1455,
+  "series_total": 206,
+  "series_kept": 124,
+  "rows_in_kept_series": 2193288,
+  "rows_with_power_weather": 1089021,
+  "rows_with_climdiv": 2193232,
+  "rows_with_soil": 2176966,
+  "rows": 2193288,
+  "counties": 2985,
+  "commodities": 23,
+  "years": [
+    1909,
+    2025
+  ]
+}

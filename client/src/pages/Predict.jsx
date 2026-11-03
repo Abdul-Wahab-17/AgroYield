@@ -1,455 +1,165 @@
-import React, { useState, useEffect } from 'react';
-import './../App.css';
+import { useEffect, useMemo, useState } from 'react';
+import { API_URL } from '../api';
+import '../App.css';
 
-function App() {
-  const [metadata, setMetadata] = useState({ crops: [], states: [], available_models: [] });
+const fmt = (n) => Number(n).toLocaleString(undefined, { maximumFractionDigits: 1 });
+const label = (s) => (s.class === 'ALL CLASSES' ? '' : `${s.class} · `) + s.practice.replace('ALL PRODUCTION PRACTICES', 'all practices').toLowerCase();
+
+const OVERRIDES = [
+  ['Season weather', [['tmax_season', 'Avg max temp (°C)'], ['tmin_season', 'Avg min temp (°C)'], ['prcp_season', 'Season rainfall (mm)'],
+    ['gdd_season', 'Growing degree days'], ['heat_days', 'Days above 35 °C']]],
+  ['Soil (0–30 cm)', [['clay_pct', 'Clay (%)'], ['sand_pct', 'Sand (%)'], ['organic_matter_pct', 'Organic matter (%)'], ['ph', 'pH']]],
+];
+
+export default function Predict() {
+  const [meta, setMeta] = useState(null);
+  const [form, setForm] = useState({ commodity: 'CORN', series: '', state: '', county: '', year: new Date().getFullYear(), model: '' });
+  const [overrides, setOverrides] = useState({});
+  const [states, setStates] = useState([]);
   const [counties, setCounties] = useState([]);
-  const [validStates, setValidStates] = useState([]);
-  const [selectedModel, setSelectedModel] = useState('');
-
-  const [formData, setFormData] = useState({
-    Crop: '',
-    State: '',
-    County: '',
-    Year: new Date().getFullYear(),
-    prcp_growing_total: '',
-    tavg_growing_avg: '',
-    tmin_growing_avg: '',
-    tmax_growing_avg: '',
-    rh_growing_avg: '',
-    gdd_total: '',
-    heat_stress_days: '',
-    temp_range_avg: '',
-    clay_pct: '',
-    sand_pct: '',
-    silt_pct: '',
-    organic_matter_pct: '',
-    ph: '',
-    bulk_density: '',
-    cec: '',
-    awc: '',
-    Latitude: '',
-    Longitude: ''
-  });
-
   const [result, setResult] = useState(null);
-  const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(false);
 
-  // Fetch Metadata on Load
   useEffect(() => {
-    fetch('http://localhost:5000/metadata')
-      .then(res => res.json())
-      .then(data => {
-        setMetadata(data);
-        setSelectedModel(data.current_model);
-      })
-      .catch(err => console.error("Failed to load metadata", err));
+    fetch(`${API_URL}/metadata`).then(r => r.json()).then(m => {
+      setMeta(m);
+      setForm(f => ({ ...f, model: m.default_model }));
+    }).catch(() => setError('Cannot reach the API. Is it running?'));
   }, []);
 
-  // Fetch valid states when crop changes
+  const crop = useMemo(() => meta?.crops.find(c => c.commodity === form.commodity), [meta, form.commodity]);
+  const series = useMemo(() => crop?.series.find(s => s.series === form.series) || crop?.series.find(s => s.headline) || crop?.series[0], [crop, form.series]);
+
   useEffect(() => {
-    if (formData.Crop) {
-      fetch(`http://localhost:5000/valid-states/${formData.Crop}`)
-        .then(res => res.json())
-        .then(data => setValidStates(data.states))
-        .catch(err => {
-          console.error("Failed to load valid states", err);
-          setValidStates(metadata.states); // Fallback to all states
-        });
-      // Reset state and county when crop changes
-      setFormData(prev => ({ ...prev, State: '', County: '' }));
-    } else {
-      setValidStates([]);
-    }
-  }, [formData.Crop, metadata.states]);
-
-  // Fetch Counties when State changes
+    if (!series) return;
+    setStates(series.states);
+    setForm(f => (f.state && !series.states.includes(f.state) ? { ...f, state: '', county: '' } : f));
+  }, [series]);
   useEffect(() => {
-    if (formData.State) {
-      fetch(`http://localhost:5000/counties/${formData.State}`)
-        .then(res => res.json())
-        .then(data => setCounties(data.counties))
-        .catch(err => console.error("Failed to load counties", err));
-      setFormData(prev => ({ ...prev, County: '' }));
-    } else {
-      setCounties([]);
-    }
-  }, [formData.State]);
+    if (!series || !form.state) { setCounties([]); return; }
+    fetch(`${API_URL}/counties/${form.state}?series=${encodeURIComponent(series.series)}`)
+      .then(r => r.json()).then(d => setCounties(d.counties || [])).catch(() => setCounties([]));
+  }, [series, form.state]);
 
-  const handleChange = (e) => {
-    setFormData({
-      ...formData,
-      [e.target.name]: e.target.value
-    });
-  };
+  const set = (k, v) => setForm(f => ({ ...f, [k]: v, ...(k === 'commodity' ? { series: '', state: '', county: '' } : {}), ...(k === 'state' ? { county: '' } : {}) }));
 
-  const handleModelChange = (e) => {
-    const newModel = e.target.value;
-    setSelectedModel(newModel);
-
-    // Optionally switch model on backend
-    fetch(`http://localhost:5000/models/${newModel}`, {
-      method: 'POST'
-    })
-      .then(res => res.json())
-      .then(data => console.log(data.message))
-      .catch(err => console.error("Failed to switch model", err));
-  };
-
-  const validateInputs = () => {
-    const errors = [];
-
-    // Only validate if values are provided
-    if (formData.tavg_growing_avg && (parseFloat(formData.tavg_growing_avg) < -20 || parseFloat(formData.tavg_growing_avg) > 45)) {
-      errors.push("Average temperature should be -20°C to 45°C");
-    }
-    if (formData.tmin_growing_avg && (parseFloat(formData.tmin_growing_avg) < -30 || parseFloat(formData.tmin_growing_avg) > 40)) {
-      errors.push("Minimum temperature should be -30°C to 40°C");
-    }
-    if (formData.tmax_growing_avg && (parseFloat(formData.tmax_growing_avg) < -10 || parseFloat(formData.tmax_growing_avg) > 50)) {
-      errors.push("Maximum temperature should be -10°C to 50°C");
-    }
-
-    // Temperature relationships (if all provided)
-    if (formData.tmin_growing_avg && formData.tavg_growing_avg && formData.tmax_growing_avg) {
-      const tmin = parseFloat(formData.tmin_growing_avg);
-      const tavg = parseFloat(formData.tavg_growing_avg);
-      const tmax = parseFloat(formData.tmax_growing_avg);
-
-      if (tmin > tavg) errors.push("Min temp cannot exceed avg temp");
-      if (tmax < tavg) errors.push("Max temp cannot be less than avg temp");
-      if (tmin > tmax) errors.push("Min temp cannot exceed max temp");
-    }
-
-    if (formData.prcp_growing_total) {
-      const rainfall = parseFloat(formData.prcp_growing_total);
-      if (rainfall < 0 || rainfall > 2000) {
-        errors.push("Rainfall should be 0-2000mm");
-      }
-    }
-
-    if (formData.rh_growing_avg) {
-      const humidity = parseFloat(formData.rh_growing_avg);
-      if (humidity < 0 || humidity > 100) {
-        errors.push("Humidity must be 0-100%");
-      }
-    }
-
-    if (formData.gdd_total) {
-      const gdd = parseFloat(formData.gdd_total);
-      if (gdd < 0 || gdd > 6000) {
-        errors.push("GDD should be 0-6000");
-      }
-    }
-
-    if (formData.heat_stress_days) {
-      const heatDays = parseFloat(formData.heat_stress_days);
-      if (heatDays < 0 || heatDays > 180) {
-        errors.push("Heat stress days should be 0-180");
-      }
-    }
-
-    // Soil validation (if all three provided)
-    if (formData.clay_pct && formData.sand_pct && formData.silt_pct) {
-      const clay = parseFloat(formData.clay_pct);
-      const sand = parseFloat(formData.sand_pct);
-      const silt = parseFloat(formData.silt_pct);
-      const sum = clay + sand + silt;
-
-      if (clay < 0 || clay > 100) errors.push("Clay % must be 0-100");
-      if (sand < 0 || sand > 100) errors.push("Sand % must be 0-100");
-      if (silt < 0 || silt > 100) errors.push("Silt % must be 0-100");
-
-      if (sum < 95 || sum > 105) {
-        errors.push(`Soil components should sum to ~100% (currently ${sum.toFixed(1)}%)`);
-      }
-    }
-
-    if (formData.ph) {
-      const ph = parseFloat(formData.ph);
-      if (ph < 4 || ph > 9) {
-        errors.push("pH should be 4-9");
-      }
-    }
-
-    if (formData.Latitude) {
-      const lat = parseFloat(formData.Latitude);
-      if (lat < 24 || lat > 50) {
-        errors.push("Latitude outside US range (24-50°N)");
-      }
-    }
-
-    if (formData.Longitude) {
-      const lon = parseFloat(formData.Longitude);
-      if (lon < -125 || lon > -65) {
-        errors.push("Longitude outside US range (-125 to -65°W)");
-      }
-    }
-
-    return errors;
-  };
-
-  const handleSubmit = async (e) => {
+  async function submit(e) {
     e.preventDefault();
-    setLoading(true);
-    setError(null);
-    setResult(null);
-
-    const validationErrors = validateInputs();
-    if (validationErrors.length > 0) {
-      setError(validationErrors.join("; "));
-      setLoading(false);
-      return;
-    }
-
+    setLoading(true); setError(null); setResult(null);
     try {
-      const requestData = { ...formData, model: selectedModel };
-
-      const response = await fetch('http://localhost:5000/predict', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(requestData)
+      const res = await fetch(`${API_URL}/predict`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...overrides, series: series.series, state: form.state, county: form.county, year: Number(form.year), model: form.model }),
       });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setResult(data);  // Store entire response object
-        if (data.warnings) {
-          
-        }
-      } else {
-        setError(data.error || "Prediction failed");
-        if (data.valid_states) {
-          setError(prev => prev + `. Valid states: ${data.valid_states.join(', ')}`);
-        }
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Prediction failed');
+      setResult(data);
     } catch (err) {
-      setError("Network error. Ensure Flask backend is running.");
+      setError(err.message);
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  };
+  }
+
+  if (!meta) return <div className="app-container"><p>{error || 'Loading…'}</p></div>;
 
   return (
     <div className="app-container">
       <header>
         <h1>🌱 Crop Yield Predictor</h1>
-        <p>ML-powered yield prediction with multiple models</p>
+        <p>Pick a crop, a county and a year</p>
       </header>
-
       <div className="main-content">
-        <form onSubmit={handleSubmit} className="prediction-form">
-
-          {/* Model Selection */}
+        <form onSubmit={submit} className="prediction-form">
           <div className="form-section">
-            <h3>Model Selection</h3>
+            <h3>Crop and place</h3>
             <div className="input-group">
-              <label>ML Model</label>
-              <select value={selectedModel} onChange={handleModelChange}>
-                {metadata.available_models && metadata.available_models.map(model => (
-                  <option key={model} value={model}>{model}</option>
-                ))}
-              </select>
-              <small style={{ color: '#666' }}>Different models may produce slightly different predictions</small>
-            </div>
-          </div>
-
-          {/* Required Fields */}
-          <div className="form-section">
-            <h3>Location & Crop (Required)</h3>
-
-            <div className="input-group">
-              <label>Crop Type</label>
-              <select name="Crop" value={formData.Crop} onChange={handleChange} required>
-                <option value="">-- Select Crop --</option>
-                {metadata.crops.map(crop => (
-                  <option key={crop} value={crop}>{crop}</option>
-                ))}
+              <label>Crop</label>
+              <select value={form.commodity} onChange={e => set('commodity', e.target.value)}>
+                {meta.crops.map(c => <option key={c.commodity} value={c.commodity}>{c.commodity}</option>)}
               </select>
             </div>
-
+            {crop?.series.length > 1 && (
+              <div className="input-group">
+                <label>Variety</label>
+                <select value={series?.series} onChange={e => set('series', e.target.value)}>
+                  {crop.series.map(s => <option key={s.series} value={s.series}>{label(s) || 'all classes'} ({s.unit.toLowerCase()})</option>)}
+                </select>
+              </div>
+            )}
             <div className="input-group">
               <label>State</label>
-              <select name="State" value={formData.State} onChange={handleChange} required>
-                <option value="">-- Select State --</option>
-                {(validStates.length > 0 ? validStates : metadata.states).map(state => (
-                  <option key={state} value={state}>{state}</option>
-                ))}
+              <select name="State" value={form.state} onChange={e => set('state', e.target.value)} required>
+                <option value="">Select a state</option>
+                {states.map(s => <option key={s} value={s}>{s}</option>)}
               </select>
-              {validStates.length > 0 && formData.Crop && (
-                <small style={{ color: '#666' }}>
-                  Showing states where {formData.Crop} is typically grown
-                </small>
-              )}
+              <small style={{ color: '#666' }}>States with recent yield records for this variety</small>
             </div>
-
             <div className="input-group">
               <label>County</label>
-              <select
-                name="County"
-                value={formData.County}
-                onChange={handleChange}
-                required
-                disabled={!formData.State}
-              >
-                <option value="">-- Select County --</option>
-                {counties.map(county => (
-                  <option key={county} value={county}>{county}</option>
-                ))}
+              <select name="County" value={form.county} onChange={e => set('county', e.target.value)} required disabled={!counties.length}>
+                <option value="">{form.state ? 'Select a county' : 'Choose a state first'}</option>
+                {counties.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
-              {!formData.State && <small style={{ color: '#999' }}>Select a state first</small>}
             </div>
-          </div>
-
-          {/* Year Field */}
-          <div className="form-section">
-            <h3>Year</h3>
             <div className="input-group">
               <label>Year</label>
-              <input
-                type="number"
-                name="Year"
-                min="1980"
-                max="2050"
-                value={formData.Year}
-                onChange={handleChange}
-              />
+              <input type="number" name="Year" min="1981" max="2100" value={form.year} onChange={e => set('year', e.target.value)} required />
             </div>
           </div>
 
-          {/* Optional Weather Fields */}
           <div className="form-section">
-            <h3>Weather Conditions (Optional)</h3>
-            <div className="input-grid">
-              <div className="input-group">
-                <label>Total Rainfall (mm)</label>
-                <input type="number" name="prcp_growing_total" placeholder="Default: 500" value={formData.prcp_growing_total} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Avg Temperature (°C)</label>
-                <input type="number" name="tavg_growing_avg" placeholder="Default: 20" value={formData.tavg_growing_avg} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Min Temperature (°C)</label>
-                <input type="number" name="tmin_growing_avg" placeholder="Default: 14" value={formData.tmin_growing_avg} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Max Temperature (°C)</label>
-                <input type="number" name="tmax_growing_avg" placeholder="Default: 26" value={formData.tmax_growing_avg} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Relative Humidity (%)</label>
-                <input type="number" name="rh_growing_avg" placeholder="Default: 65" value={formData.rh_growing_avg} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Growing Degree Days</label>
-                <input type="number" name="gdd_total" placeholder="Default: 2500" value={formData.gdd_total} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Heat Stress Days</label>
-                <input type="number" name="heat_stress_days" placeholder="Default: 5" value={formData.heat_stress_days} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Temperature Range (°C)</label>
-                <input type="number" name="temp_range_avg" placeholder="Default: 12" value={formData.temp_range_avg} onChange={handleChange} />
-              </div>
+            <h3>Model</h3>
+            <div className="input-group">
+              <select value={form.model} onChange={e => set('model', e.target.value)}>
+                {meta.models.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
             </div>
           </div>
 
-          {/* Optional Soil Fields */}
-          <div className="form-section">
-            <h3>Soil Conditions (Optional)</h3>
-            <div className="input-grid">
-              <div className="input-group">
-                <label>Clay (%)</label>
-                <input type="number" name="clay_pct" placeholder="Default: 20" value={formData.clay_pct} onChange={handleChange} />
+          <details className="form-section">
+            <summary><strong>Optional: override the county's normal weather and soil</strong></summary>
+            {OVERRIDES.map(([title, fields]) => (
+              <div key={title}>
+                <h3>{title}</h3>
+                <div className="input-grid">
+                  {fields.map(([key, text]) => (
+                    <div className="input-group" key={key}>
+                      <label>{text}</label>
+                      <input type="number" step="any" placeholder="County normal" value={overrides[key] ?? ''}
+                             onChange={e => setOverrides(o => ({ ...o, [key]: e.target.value }))} />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <div className="input-group">
-                <label>Sand (%)</label>
-                <input type="number" name="sand_pct" placeholder="Default: 40" value={formData.sand_pct} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Silt (%)</label>
-                <input type="number" name="silt_pct" placeholder="Default: 40" value={formData.silt_pct} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Organic Matter (%)</label>
-                <input type="number" name="organic_matter_pct" placeholder="Default: 2.5" value={formData.organic_matter_pct} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>pH</label>
-                <input type="number" name="ph" placeholder="Default: 6.5" step="0.1" value={formData.ph} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Bulk Density (g/cm³)</label>
-                <input type="number" name="bulk_density" placeholder="Default: 1.3" step="0.1" value={formData.bulk_density} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>CEC</label>
-                <input type="number" name="cec" placeholder="Default: 15" value={formData.cec} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>AWC</label>
-                <input type="number" name="awc" placeholder="Default: 0.15" step="0.01" value={formData.awc} onChange={handleChange} />
-              </div>
-            </div>
-          </div>
+            ))}
+          </details>
 
-          {/* Optional Geographic Fields */}
-          <div className="form-section">
-            <h3>Geographic Location (Optional)</h3>
-            <div className="input-grid">
-              <div className="input-group">
-                <label>Latitude</label>
-                <input type="number" name="Latitude" placeholder="Default: 38" step="0.01" value={formData.Latitude} onChange={handleChange} />
-              </div>
-              <div className="input-group">
-                <label>Longitude</label>
-                <input type="number" name="Longitude" placeholder="Default: -95" step="0.01" value={formData.Longitude} onChange={handleChange} />
-              </div>
-            </div>
-          </div>
-
-          <button type="submit" className="submit-btn" disabled={loading}>
-            {loading ? 'Calculating...' : 'Predict Yield'}
+          <button type="submit" className="submit-btn" disabled={loading || !form.state || !form.county}>
+            {loading ? 'Predicting…' : 'Predict yield'}
           </button>
         </form>
 
-        {/* Results Display */}
+        {error && <div className="error-msg">{error}</div>}
+
         {result && (
           <div className="result-card">
-            <h2>Predicted Yield</h2>
-            <div className="prediction-value">
-              {result.prediction.toFixed(2)} <span className="unit">{result.units}</span>
-            </div>
-            <p className="model-info">Using: {selectedModel}</p>
-            {result.confidence && (
-              <p className="confidence-info" style={{ marginTop: '5px' }}>
-                Confidence: <strong style={{ color: result.confidence === 'High' ? 'green' : result.confidence === 'Medium' ? 'orange' : 'red' }}>
-                  {result.confidence}
-                </strong>
+            <h2>Predicted yield</h2>
+            <p className="prediction-value">{fmt(result.prediction)} <span className="unit">{result.unit.toLowerCase()}</span></p>
+            <p className="model-info">{result.commodity} · {form.county}, {form.state} · {form.year} · {result.model}</p>
+            <p>Last observed here: <strong>{fmt(result.last_observed.yield)}</strong> in {result.last_observed.year}.
+               Range across counties in {result.typical_range_years?.[0]}–{result.typical_range_years?.[1]}: {fmt(result.typical_range[0])}–{fmt(result.typical_range[1])}.</p>
+            {result.expected_error_pct != null && (
+              <p className="typical-range">
+                On years the model never saw ({result.evaluated_on}), its median error for {result.commodity.toLowerCase()} was about {result.expected_error_pct}%.
               </p>
             )}
-            {result.typical_range && (
-              <p className="typical-range" style={{ fontSize: '0.9em', color: '#666' }}>
-                Typical range: {result.typical_range}
-              </p>
-            )}
-            {result.warnings && result.warnings.length > 0 && (
-              <div className="warnings">
-                {result.warnings.map((warning, idx) => (
-                  <div key={idx} className="warning-msg">⚠️ {warning}</div>
-                ))}
-              </div>
-            )}
+            <p className="typical-range">Weather and soil: {result.inputs}.
+              {result.history === 'partial' && ' This year is not after the last observation, so the county history it uses is limited.'}</p>
           </div>
         )}
-
-        {error && <div className="error-msg">{error}</div>}
       </div>
     </div>
   );
 }
-
-export default App;

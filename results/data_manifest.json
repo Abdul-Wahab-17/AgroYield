@@ -1,0 +1,46 @@
+{
+  "climdiv_season": {
+    "bytes": 87639394,
+    "downloaded": "2026-11-02",
+    "file": "data/raw/climdiv_season.csv",
+    "note": "NOAA nClimDiv county monthly climate + Palmer drought indices",
+    "rows": 413364,
+    "sha256": "01c80ebf63c6aa6c1c285155a3e989fc63749f37d58a3dc764a1bf1b3a5e94c9",
+    "source": "https://www.ncei.noaa.gov/pub/data/cirs/climdiv (20261006)"
+  },
+  "counties": {
+    "bytes": 186418,
+    "downloaded": "2026-11-02",
+    "file": "data/raw/counties.csv",
+    "rows": 3142,
+    "sha256": "7c73ab400376c3344539170d9f884a802a39a235fada7806c60a54b0f3d39ade",
+    "source": "https://www2.census.gov/geo/docs/maps-data/data/gazetteer/2020_Gazetteer/2020_Gaz_counties_national.zip"
+  },
+  "nass_county": {
+    "bytes": 236605505,
+    "downloaded": "2026-11-03",
+    "file": "data/raw/nass_county.csv",
+    "note": "Quick Stats crops snapshot 20261031; county-level annual yields",
+    "rows": 2215608,
+    "sha256": "9f7ec99b68e0719edb8f590f24225a9fe9444ef0ca1ae472deb5fbb41e2b85e3",
+    "source": "https://www.nass.usda.gov/datasets/qs.crops_20261031.txt.gz"
+  },
+  "soil_ssurgo": {
+    "bytes": 176838,
+    "downloaded": "2026-11-03",
+    "file": "data/raw/soil_ssurgo.csv",
+    "note": "SSURGO 0-30 cm area/depth-weighted county means; counties without data are absent",
+    "rows": 3124,
+    "sha256": "8a60b8db23fd62914176bf71bc4eecd5737aa8b26c283911d4dda3cd8cbfe107",
+    "source": "https://SDMDataAccess.nrcs.usda.gov/Tabular/SDMTabularService/post.rest"
+  },
+  "weather_season": {
+    "bytes": 28800498,
+    "downloaded": "2026-11-02",
+    "file": "data/raw/weather_season.csv",
+    "note": "NASA POWER daily (0.5x0.625 deg grid cells), season features per county-year",
+    "rows": 141390,
+    "sha256": "34649f1b7df299ea3dd9e6bb6ab027035e3b07b3d0d30921a6654ea750f31a88",
+    "source": "https://power.larc.nasa.gov/api/temporal/daily/point"
+  }
+}
